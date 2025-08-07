@@ -34,7 +34,7 @@ async def register(user: UserRegistrationRequestSchema, db: AsyncSession = Depen
         raise HTTPException(status_code=409, detail=f"A user with this email {user.email} already exists.")
 
     hashed = hash_password(user.password)
-    new_user = UserModel(email=user.email, hashed_password=hashed, role=user.role)
+    new_user = UserModel(email=user.email, password=hashed, group_id=user.role)
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
