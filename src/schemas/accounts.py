@@ -1,11 +1,15 @@
-from pydantic import BaseModel, EmailStr, field_validator, Field
+from pydantic import BaseModel, EmailStr, field_validator
 
 from database import accounts_validators
+
+from database.models.accounts import UserGroupEnum
+
 
 
 class UserRegistrationRequestSchema(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8, max_length=30)
+    password: str
+    role: UserGroupEnum = UserGroupEnum.USER
 
 
     @field_validator("password")
@@ -17,6 +21,7 @@ class UserRegistrationRequestSchema(BaseModel):
 class UserRegistrationResponseSchema(BaseModel):
     id: int
     email: EmailStr
+    role: UserGroupEnum = UserGroupEnum.USER
 
 
 class UserActivationRequestSchema(BaseModel):
