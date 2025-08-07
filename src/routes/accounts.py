@@ -33,9 +33,18 @@ async def register(user: UserRegistrationRequestSchema, db: AsyncSession = Depen
     if db_user:
         raise HTTPException(status_code=409, detail=f"A user with this email {user.email} already exists.")
 
-    hashed = hash_password(user.password)
-    new_user = UserModel(email=user.email, password=hashed, group_id=user.role)
-    db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
-    return new_user
+    try:
+        hashed = hash_password(user.password)
+        new_user = UserModel(email=user.email, password=hashed, group_id=user.role)
+
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
+        return new_user
+
+    except Exception:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred during user creation."
+        )
