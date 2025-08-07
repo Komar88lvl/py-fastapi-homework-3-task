@@ -8,6 +8,12 @@ class UserRegistrationRequestSchema(BaseModel):
     password: str = Field(min_length=8, max_length=30)
 
 
+    @field_validator("password")
+    @classmethod
+    def password_strength_validator(cls, password: str) -> str:
+        return accounts_validators.validate_password_strength(password)
+
+
 class UserRegistrationResponseSchema(BaseModel):
     id: int
     email: EmailStr
