@@ -94,11 +94,15 @@ async def activate_user_account(request: UserActivationRequestSchema, db: AsyncS
     return {"message": "User account activated successfully."}
 
 
-@router.post("/password-reset/request/",response_model=PasswordResetRequestSchema, status_code=status.HTTP_200_OK)
-async def reset_password(email: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(UserModel).where(UserModel.email == email))
+@router.post("/password-reset/request/", status_code=status.HTTP_200_OK)
+async def reset_password(request: PasswordResetRequestSchema, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(UserModel).where(UserModel.email == request.email))
     db_user = result.scalars().first()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")
-    await db.commit()
-    return {"detail": "Password updated"}
+    if db_user and db_user.is_active:
+
+        new_token = PasswordResetTokenModel(user=db_user)
+        db.add(new_token)
+        await db.commit()
+        await db.refresh(new_token)
+
+    return {"message": "If you are registered, you will receive an email with instructions."}
