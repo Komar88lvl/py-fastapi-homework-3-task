@@ -20,6 +20,22 @@ from database import (
 from exceptions import BaseSecurityError
 from security.interfaces import JWTAuthManagerInterface
 
+from schemas.accounts import UserRegistrationResponseSchema, UserRegistrationRequestSchema
+from security.passwords import hash_password
+
 router = APIRouter()
 
-# Write your code here
+
+@router.post("/register/", response_model=UserRegistrationResponseSchema, status_code=status.HTTP_201_CREATED)
+async def register(user: UserRegistrationRequestSchema, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(UserModel).where(UserModel.email == user.email))
+    db_user = result.scalars().first()
+    if db_user:
+        raise HTTPException(status_code=409, detail=f"A user with this email {user.email} already exists.")
+
+    hashed = hash_password(user.password)
+    new_user = UserModel(email=user.email, hashed_password=hashed, role=user.role)
+    db.add(new_user)
+    await db.commit()
+    await db.refresh(new_user)
+    return new_user
