@@ -36,10 +36,15 @@ async def register(user: UserRegistrationRequestSchema, db: AsyncSession = Depen
     try:
         hashed = hash_password(user.password)
         new_user = UserModel(email=user.email, password=hashed, group_id=user.role)
-
         db.add(new_user)
         await db.commit()
         await db.refresh(new_user)
+
+        access_token = ActivationTokenModel(user=new_user)
+        db.add(access_token)
+        await db.commit()
+        await db.refresh(access_token)
+
         return new_user
 
     except Exception:
