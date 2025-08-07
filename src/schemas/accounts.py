@@ -9,7 +9,8 @@ class UserRegistrationRequestSchema(BaseModel):
 
 
 class UserRegistrationResponseSchema(BaseModel):
-    pass
+    id: int
+    email: EmailStr
 
 
 class UserActivationRequestSchema(BaseModel):
