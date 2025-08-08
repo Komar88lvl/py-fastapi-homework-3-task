@@ -21,7 +21,6 @@ class UserRegistrationRequestSchema(BaseModel):
 class UserRegistrationResponseSchema(BaseModel):
     id: int
     email: EmailStr
-    role: UserGroupEnum = UserGroupEnum.USER
 
 
 class UserActivationRequestSchema(BaseModel):

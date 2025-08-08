@@ -70,6 +70,7 @@ async def register(user: UserRegistrationRequestSchema, db: AsyncSession = Depen
 async def activate_user_account(request: UserActivationRequestSchema, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(ActivationTokenModel)
+        .options(joinedload(ActivationTokenModel.user))
         .where(ActivationTokenModel.token == request.token)
     )
     activation_token = result.scalars().first()
@@ -80,17 +81,7 @@ async def activate_user_account(request: UserActivationRequestSchema, db: AsyncS
             detail="Invalid or expired activation token."
         )
 
-    result = await db.execute(
-        select(UserModel)
-        .where(UserModel.email == request.email)
-    )
-    user = result.scalars().first()
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired activation token."
-        )
+    user = activation_token.user
 
     if user.is_active:
         raise HTTPException(
@@ -163,9 +154,10 @@ async def reset_password_complete(request: PasswordResetCompleteRequestSchema, d
     try:
         hashed = hash_password(request.password)
         db_user._hashed_password = hashed
+        await db.delete(token)
         await db.commit()
         await db.refresh(db_user)
-        await db.delete(token)
+
         return {"message": "Password reset successfully."}
     except SQLAlchemyError:
         await db.rollback()
