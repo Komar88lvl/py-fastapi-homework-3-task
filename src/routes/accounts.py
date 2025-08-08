@@ -20,7 +20,7 @@ from database import (
 from exceptions import BaseSecurityError
 from security.interfaces import JWTAuthManagerInterface
 
-from schemas.accounts import UserRegistrationResponseSchema, UserRegistrationRequestSchema, UserActivationRequestSchema, PasswordResetRequestSchema, PasswordResetCompleteRequestSchema, UserLoginResponseSchema, UserLoginRequestSchema
+from schemas.accounts import UserRegistrationResponseSchema, UserRegistrationRequestSchema, UserActivationRequestSchema, PasswordResetRequestSchema, PasswordResetCompleteRequestSchema, UserLoginResponseSchema, UserLoginRequestSchema, TokenRefreshResponseSchema, TokenRefreshRequestSchema
 from security.passwords import hash_password
 
 router = APIRouter()
@@ -193,3 +193,52 @@ async def login_user(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while processing the request."
         )
+
+
+@router.post("/refresh/", response_model=TokenRefreshResponseSchema)
+async def refresh_access_token(
+    request: TokenRefreshRequestSchema,
+    db: AsyncSession = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+):
+    try:
+        token_data = jwt_manager.decode_refresh_token(request.refresh_token)
+        user_id = token_data.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid token payload."
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+    token_result = await db.execute(
+        select(RefreshTokenModel).where(RefreshTokenModel.token == request.refresh_token)
+    )
+    token_in_db = token_result.scalars().first()
+
+    if not token_in_db:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token not found."
+        )
+
+    user_result = await db.execute(
+        select(UserModel).where(UserModel.id == user_id)
+    )
+    db_user = user_result.scalars().first()
+
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found."
+        )
+
+    access_token = jwt_manager.create_access_token(
+        data={"user_id": db_user.id, "email": db_user.email}
+    )
+
+    return {"access_token": access_token}
