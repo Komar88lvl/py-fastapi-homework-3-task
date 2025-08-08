@@ -55,8 +55,8 @@ class UserLoginRequestSchema(BaseModel):
 
 
 class TokenRefreshRequestSchema(BaseModel):
-    pass
+    refresh_token: str
 
 
 class TokenRefreshResponseSchema(BaseModel):
-    pass
+    access_token: str
