@@ -20,7 +20,17 @@ from database import (
 from exceptions import BaseSecurityError
 from security.interfaces import JWTAuthManagerInterface
 
-from schemas.accounts import UserRegistrationResponseSchema, UserRegistrationRequestSchema, UserActivationRequestSchema, PasswordResetRequestSchema, PasswordResetCompleteRequestSchema, UserLoginResponseSchema, UserLoginRequestSchema, TokenRefreshResponseSchema, TokenRefreshRequestSchema
+from schemas.accounts import (
+    UserRegistrationResponseSchema,
+    UserRegistrationRequestSchema,
+    UserActivationRequestSchema,
+    PasswordResetRequestSchema,
+    PasswordResetCompleteRequestSchema,
+    UserLoginResponseSchema,
+    UserLoginRequestSchema,
+    TokenRefreshResponseSchema,
+    TokenRefreshRequestSchema
+)
 from security.passwords import hash_password
 
 router = APIRouter()
@@ -119,7 +129,8 @@ async def reset_password_complete(request: PasswordResetCompleteRequestSchema, d
     user_result = await db.execute(select(UserModel).where(UserModel.email == request.email))
     db_user = user_result.scalars().first()
 
-    if (not token
+    if (
+        not token
         or not db_user
         or not db_user.is_active
         or db_user.email != request.email
@@ -185,7 +196,6 @@ async def login_user(
             access_token=access_token,
             refresh_token=refresh_token
         )
-
 
     except SQLAlchemyError:
         await db.rollback()
