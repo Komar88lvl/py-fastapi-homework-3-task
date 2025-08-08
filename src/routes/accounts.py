@@ -20,7 +20,7 @@ from database import (
 from exceptions import BaseSecurityError
 from security.interfaces import JWTAuthManagerInterface
 
-from schemas.accounts import UserRegistrationResponseSchema, UserRegistrationRequestSchema, UserActivationRequestSchema, PasswordResetRequestSchema
+from schemas.accounts import UserRegistrationResponseSchema, UserRegistrationRequestSchema, UserActivationRequestSchema, PasswordResetRequestSchema, PasswordResetCompleteRequestSchema
 from security.passwords import hash_password
 
 router = APIRouter()
@@ -47,7 +47,7 @@ async def register(user: UserRegistrationRequestSchema, db: AsyncSession = Depen
 
         return new_user
 
-    except Exception:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -106,3 +106,44 @@ async def reset_password(request: PasswordResetRequestSchema, db: AsyncSession =
         await db.refresh(new_token)
 
     return {"message": "If you are registered, you will receive an email with instructions."}
+
+
+@router.post("/reset-password/complete/", status_code=status.HTTP_200_OK)
+async def reset_password_complete(request: PasswordResetCompleteRequestSchema, db: AsyncSession = Depends(get_db)):
+    token_result = await db.execute(
+        select(PasswordResetTokenModel)
+        .where(PasswordResetTokenModel.token == request.token))
+
+    token = token_result.scalars().first()
+
+    user_result = await db.execute(select(UserModel).where(UserModel.email == request.email))
+    db_user = user_result.scalars().first()
+
+    if (not token
+        or not db_user
+        or not db_user.is_active
+        or db_user.email != request.email
+    ):
+        if db_user:
+            token_by_user = await db.execute(
+                select(PasswordResetTokenModel).where(PasswordResetTokenModel.user_id == db_user.id)
+            )
+            token_to_delete = token_by_user.scalars().first()
+            if token_to_delete:
+                await db.delete(token_to_delete)
+                await db.commit()
+        raise HTTPException(status_code=400, detail="Invalid email or token.")
+
+    if token.expires_at < datetime.now():
+        await db.delete(token)
+        await db.commit()
+        raise HTTPException(status_code=400, detail="Invalid email or token.")
+
+    try:
+        db_user.password = request.password
+        await db.delete(token)
+        await db.commit()
+        return {"message": "Password reset successfully."}
+    except SQLAlchemyError:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="An error occurred while resetting the password.")
